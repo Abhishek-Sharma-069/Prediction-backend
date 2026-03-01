@@ -1,17 +1,137 @@
-// Prisma schema - https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-// Add your models below, e.g.:
-// model User {
-//   id    Int     @id @default(autoincrement())
-//   email String  @unique
-//   name  String?
-// }
+model alert_levels {
+  id            BigInt   @id @default(autoincrement())
+  level_name    String?  @db.VarChar(100)
+  severity_rank Int?
+  alerts        alerts[]
+}
+
+model alerts {
+  id             BigInt        @id @default(autoincrement())
+  region_id      BigInt?
+  prediction_id  BigInt?
+  alert_level_id BigInt?
+  message        String?
+  issued_at      DateTime?     @db.Timestamp(6)
+  expires_at     DateTime?     @db.Timestamp(6)
+  status         String?       @db.VarChar(50)
+  alert_levels   alert_levels? @relation(fields: [alert_level_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "alerts_level_fk")
+  predictions    predictions?  @relation(fields: [prediction_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "alerts_prediction_fk")
+  regions        regions?      @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "alerts_region_fk")
+}
+
+model disaster_types {
+  id                        BigInt        @id @default(autoincrement())
+  name                      String?       @db.VarChar(100)
+  category                  String?       @db.VarChar(100)
+  severity_scale_definition String?
+  predictions               predictions[]
+}
+
+model models {
+  id                BigInt        @id @default(autoincrement())
+  name              String?       @db.VarChar(150)
+  algorithm         String?       @db.VarChar(150)
+  version           String?       @db.VarChar(100)
+  training_accuracy Float?
+  training_date     DateTime?     @db.Date
+  artifact_path     String?
+  predictions       predictions[]
+}
+
+model predictions {
+  id                    BigInt          @id @default(autoincrement())
+  region_id             BigInt?
+  disaster_type_id      BigInt?
+  model_id              BigInt?
+  predicted_probability Float?
+  predicted_severity    Float?
+  risk_score            Float?
+  generated_at          DateTime?       @db.Timestamp(6)
+  input_snapshot        Json?
+  alerts                alerts[]
+  disaster_types        disaster_types? @relation(fields: [disaster_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "predictions_disaster_type_fk")
+  models                models?         @relation(fields: [model_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "predictions_model_fk")
+  regions               regions?        @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "predictions_region_fk")
+}
+
+model regions {
+  id              BigInt        @id @default(autoincrement())
+  name            String?       @db.VarChar(150)
+  type            String?       @db.VarChar(100)
+  population      BigInt?
+  risk_zone_level Int?
+  created_at      DateTime?     @default(now()) @db.Timestamp(6)
+  alerts          alerts[]
+  predictions     predictions[]
+  sensors         sensors[]
+  users           users[]
+}
+
+model roles {
+  id          BigInt       @id @default(autoincrement())
+  role_name   String?      @db.VarChar(100)
+  description String?
+  user_roles  user_roles[]
+}
+
+model sensor_readings {
+  id            BigInt    @id @default(autoincrement())
+  sensor_id     BigInt?
+  reading_value Float?
+  unit          String?   @db.VarChar(50)
+  recorded_at   DateTime? @db.Timestamp(6)
+  quality_score Int?
+  raw_payload   Json?
+  sensors       sensors?  @relation(fields: [sensor_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "sensor_readings_sensor_fk")
+}
+
+model sensor_types {
+  id          BigInt    @id @default(autoincrement())
+  name        String?   @db.VarChar(100)
+  description String?
+  sensors     sensors[]
+}
+
+model sensors {
+  id                BigInt            @id @default(autoincrement())
+  sensor_code       String?           @db.VarChar(100)
+  sensor_type_id    BigInt?
+  region_id         BigInt?
+  latitude          Float?
+  longitude         Float?
+  installation_date DateTime?         @db.Date
+  status            String?           @db.VarChar(50)
+  last_maintenance  DateTime?         @db.Date
+  sensor_readings   sensor_readings[]
+  regions           regions?          @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "sensors_region_fk")
+  sensor_types      sensor_types?     @relation(fields: [sensor_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "sensors_sensor_type_fk")
+}
+
+model user_roles {
+  user_id BigInt
+  role_id BigInt
+  roles   roles  @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_roles_role_fk")
+  users   users  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_roles_user_fk")
+
+  @@id([user_id, role_id])
+}
+
+model users {
+  id         BigInt       @id @default(autoincrement())
+  name       String?      @db.VarChar(150)
+  email      String?      @db.VarChar(150)
+  otp        String?      @db.VarChar(20)
+  region_id  BigInt?
+  created_at DateTime?    @default(now()) @db.Timestamp(6)
+  status     String?      @db.VarChar(50)
+  user_roles user_roles[]
+  regions    regions?     @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "users_region_fk")
+}
