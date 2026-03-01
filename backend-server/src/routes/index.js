@@ -1,10 +1,12 @@
 import express from 'express';
+import authRoutes from './auth.routes.js';
 import sensorRoutes from './sensor.routes.js';
 import predictionRoutes from './prediction.routes.js';
 import alertRoutes from './alert.routes.js';
 import userRoutes from './user.routes.js';
 
 const router = express.Router();
+router.use('/auth', authRoutes);
 router.use('/sensors', sensorRoutes);
 router.use('/predictions', predictionRoutes);
 router.use('/alerts', alertRoutes);

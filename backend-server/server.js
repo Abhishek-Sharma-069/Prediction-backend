@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import config from './src/config/config.js';
@@ -37,6 +38,7 @@ if (config.nodeEnv === 'development') {
 }
 
 app.use(express.json());
+app.use(cookieParser());
 app.use('/api', routes);
 
 /**
@@ -52,9 +54,7 @@ app.use('/api', routes);
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
-app.use('/',(req, res) => {
-  res.send('Server is running');
-});
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {

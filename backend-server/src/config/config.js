@@ -17,4 +17,7 @@ export default {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   databaseUrl: getDatabaseUrl(),
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
+  jwtExpiry: process.env.JWT_EXPIRY || '7d',
+  cookieMaxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
 };
