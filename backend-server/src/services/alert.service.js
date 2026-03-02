@@ -1,5 +1,53 @@
-// TODO: inject prisma or DB client
-export const findAll = async () => [];
-export const findById = async (id) => null;
-export const create = async (data) => data;
-export const update = async (id, data) => ({ id, ...data });
+import { prisma } from '../lib/db.js';
+
+function toResponse(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    id: String(row.id),
+    region_id: row.region_id != null ? String(row.region_id) : null,
+    prediction_id: row.prediction_id != null ? String(row.prediction_id) : null,
+    alert_level_id: row.alert_level_id != null ? String(row.alert_level_id) : null,
+  };
+}
+
+export async function findAll() {
+  const rows = await prisma.alerts.findMany({ orderBy: { id: 'asc' } });
+  return rows.map(toResponse);
+}
+
+export async function findById(id) {
+  const row = await prisma.alerts.findFirst({ where: { id: BigInt(id) } });
+  return toResponse(row);
+}
+
+export async function create(data) {
+  const row = await prisma.alerts.create({
+    data: {
+      region_id: data.region_id != null ? BigInt(data.region_id) : null,
+      prediction_id: data.prediction_id != null ? BigInt(data.prediction_id) : null,
+      alert_level_id: data.alert_level_id != null ? BigInt(data.alert_level_id) : null,
+      message: data.message ?? null,
+      issued_at: data.issued_at ?? null,
+      expires_at: data.expires_at ?? null,
+      status: data.status ?? null,
+    },
+  });
+  return toResponse(row);
+}
+
+export async function update(id, data) {
+  const payload = {};
+  if (data.region_id !== undefined) payload.region_id = data.region_id == null ? null : BigInt(data.region_id);
+  if (data.prediction_id !== undefined) payload.prediction_id = data.prediction_id == null ? null : BigInt(data.prediction_id);
+  if (data.alert_level_id !== undefined) payload.alert_level_id = data.alert_level_id == null ? null : BigInt(data.alert_level_id);
+  if (data.message !== undefined) payload.message = data.message;
+  if (data.issued_at !== undefined) payload.issued_at = data.issued_at;
+  if (data.expires_at !== undefined) payload.expires_at = data.expires_at;
+  if (data.status !== undefined) payload.status = data.status;
+  const row = await prisma.alerts.update({
+    where: { id: BigInt(id) },
+    data: payload,
+  });
+  return toResponse(row);
+}

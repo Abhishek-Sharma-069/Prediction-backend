@@ -1,7 +1,9 @@
+import * as sensorService from '../services/sensor.service.js';
+
 export const getSensors = async (req, res, next) => {
   try {
-    // TODO: use sensorService
-    res.json({ data: [] });
+    const data = await sensorService.findAll();
+    res.json({ data });
   } catch (err) {
     next(err);
   }
@@ -10,8 +12,9 @@ export const getSensors = async (req, res, next) => {
 export const getSensorById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // TODO: use sensorService
-    res.json({ data: { id } });
+    const data = await sensorService.findById(id);
+    if (!data) return res.status(404).json({ error: 'Sensor not found' });
+    res.json({ data });
   } catch (err) {
     next(err);
   }
@@ -19,8 +22,8 @@ export const getSensorById = async (req, res, next) => {
 
 export const createSensor = async (req, res, next) => {
   try {
-    // TODO: use sensorService
-    res.status(201).json({ data: req.body });
+    const data = await sensorService.create(req.body);
+    res.status(201).json({ data });
   } catch (err) {
     next(err);
   }
@@ -29,8 +32,8 @@ export const createSensor = async (req, res, next) => {
 export const updateSensor = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // TODO: use sensorService
-    res.json({ data: { id, ...req.body } });
+    const data = await sensorService.update(id, req.body);
+    res.json({ data });
   } catch (err) {
     next(err);
   }
@@ -39,7 +42,7 @@ export const updateSensor = async (req, res, next) => {
 export const deleteSensor = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // TODO: use sensorService
+    await sensorService.remove(id);
     res.status(204).send();
   } catch (err) {
     next(err);
