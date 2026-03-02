@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from primary_prediction_model import load_and_preprocess
+from .primary_prediction_model import load_and_preprocess
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_DIR = PROJECT_ROOT / "model"

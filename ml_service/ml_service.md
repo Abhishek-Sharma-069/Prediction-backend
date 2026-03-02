@@ -1,12 +1,11 @@
 # How to start
 #
-# To activate this environment, use
+# 1. Activate the environment
 #
+#     $ cd ml_service
 #     $ conda activate predict_env
+#     $ pip install -r requirements.txt
+# 2. Run the ML HTTP service
 #
-# To deactivate an active environment, use
-#
-#     $ conda deactivate
-#
-#
+#     $ uvicorn main:app --host 0.0.0.0 --port 8000
 #
