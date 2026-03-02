@@ -4,9 +4,6 @@ import { generateOtp, verifyOtp } from '../utils/otp.util.js';
 import config from '../config/config.js';
 import { prisma } from '../lib/db.js';
 
-const otpStore = new Map(); // key: email (lowercase) or mobile (digits only)
-const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 min
-
 function normalizeEmail(v) {
   return v ? String(v).trim().toLowerCase() : null;
 }
@@ -31,8 +28,20 @@ export async function sendOtp(emailOrMobile) {
   if (!key) {
     throw Object.assign(new Error('Email or mobile is required'), { statusCode: 400 });
   }
+  // Only allow OTP for existing users
+  const user = await findUserByIdentifier(emailOrMobile);
+  if (!user) {
+    throw Object.assign(new Error('User not found for this email/mobile'), { statusCode: 404 });
+  }
+
   const otp = generateOtp(6);
-  otpStore.set(key, { otp, expiresAt: Date.now() + OTP_EXPIRY_MS });
+
+  // Persist the OTP directly in the existing user row
+  await prisma.users.update({
+    where: { id: user.id },
+    data: { otp },
+  });
+
   return { message: 'OTP sent', otp: config.nodeEnv === 'development' ? otp : undefined };
 }
 
@@ -78,24 +87,26 @@ export async function loginWithOtp(identifier, otp) {
   const emailKey = normalizeEmail(identifier);
   const mobileKey = normalizeMobile(identifier);
   const key = emailKey || mobileKey;
-  if (!key) throw Object.assign(new Error('Email or mobile is required'), { statusCode: 400 });
-  const stored = otpStore.get(key);
-  if (!stored) throw Object.assign(new Error('OTP not found or expired'), { statusCode: 400 });
-  if (Date.now() > stored.expiresAt) {
-    otpStore.delete(key);
-    throw Object.assign(new Error('OTP expired'), { statusCode: 400 });
+  if (!key) {
+    throw Object.assign(new Error('Email or mobile is required'), { statusCode: 400 });
   }
-  if (!verifyOtp(stored.otp, String(otp))) throw Object.assign(new Error('Invalid OTP'), { statusCode: 401 });
-  otpStore.delete(key);
-  let user = await findUserByIdentifier(identifier);
-  if (!user) {
-    user = await prisma.users.create({
-      data: {
-        email: emailKey || null,
-        mobile: mobileKey || null,
-      },
-    });
+
+  // Validate OTP purely against the database.
+  const user = await findUserByIdentifier(identifier);
+  if (!user || !user.otp) {
+    throw Object.assign(new Error('OTP not found or expired'), { statusCode: 400 });
   }
+
+  if (!verifyOtp(user.otp, String(otp))) {
+    throw Object.assign(new Error('Invalid OTP'), { statusCode: 401 });
+  }
+
+  // Clear OTP after successful use
+  await prisma.users.update({
+    where: { id: user.id },
+    data: { otp: null },
+  });
+
   return signUser(user);
 }
 

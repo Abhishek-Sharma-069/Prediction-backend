@@ -7,6 +7,7 @@ export async function sendOtp(req, res, next) {
     const identifier = email || mobile;
     const result = await authService.sendOtp(identifier);
     res.json(result);
+    
   } catch (err) {
     next(err);
   }
