@@ -9,6 +9,7 @@ import config from './src/config/config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import routes from './src/routes/index.js';
+import { requestLogger } from './src/middlewares/requestLogger.middleware.js';
 import { errorHandler } from './src/middlewares/error.middleware.js';
 
 dotenv.config();
@@ -39,6 +40,7 @@ if (config.nodeEnv === 'development') {
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(requestLogger);
 app.use('/api', routes);
 
 /**
