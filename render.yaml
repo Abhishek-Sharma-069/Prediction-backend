@@ -1,0 +1,29 @@
+# Render Blueprint: backend-server + ml_service
+# Deploy: connect repo in Render Dashboard → New → Blueprint → select this file
+# Set DATABASE_URL, ML_SERVICE_URL (and optionally JWT_SECRET) in the dashboard when prompted or after deploy.
+
+services:
+  - type: web
+    name: backend-server
+    runtime: node
+    rootDir: backend-server
+    plan: free
+    buildCommand: npm install && npm run db:generate
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ML_SERVICE_URL
+        sync: false
+
+  - type: web
+    name: ml_service
+    runtime: python
+    rootDir: ml_service
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
