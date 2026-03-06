@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import config from './src/config/config.js';
+import { prisma } from './src/lib/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import routes from './src/routes/index.js';
@@ -58,6 +59,14 @@ app.get('/health', (req, res) => {
 });
 
 app.use(errorHandler);
+
+try {
+  await prisma.$connect();
+  console.log('Database connected');
+} catch (e) {
+  console.error('Database connection failed:', e.message);
+  process.exit(1);
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

@@ -3,14 +3,21 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 function getDatabaseUrl() {
-  const url = process.env.DATABASE_URL;
-  if (url && !url.includes('${')) return url;
-  const user = process.env.DATABASE_USER;
-  const password = process.env.DATABASE_PASSWORD;
-  const host = process.env.DATABASE_HOST;
-  const port = process.env.DATABASE_PORT;
-  const name = process.env.DATABASE_NAME;
-  return `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${name}`;
+  let url = process.env.DATABASE_URL;
+  if (!url || url.includes('${')) {
+    const user = process.env.DATABASE_USER;
+    const password = process.env.DATABASE_PASSWORD;
+    const host = process.env.DATABASE_HOST;
+    const port = process.env.DATABASE_PORT;
+    const name = process.env.DATABASE_NAME;
+    url = `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${name}`;
+  }
+  const sslMode = process.env.SSL_MODE?.trim();
+  if (sslMode) {
+    const separator = url.includes('?') ? '&' : '?';
+    url = `${url}${separator}sslmode=${encodeURIComponent(sslMode)}`;
+  }
+  return url;
 }
 
 export default {
