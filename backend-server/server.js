@@ -21,7 +21,7 @@ const PORT = config.port || 3000;
 
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
-  : [];
+  : ['*'];
 
 const corsOptions = {
   origin(origin, callback) {
