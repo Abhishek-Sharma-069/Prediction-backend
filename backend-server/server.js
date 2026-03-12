@@ -61,8 +61,6 @@ app.use('/', (req, res) => {
   res.json({ message: 'welcome on the Prediction Server' });
 });
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
 app.use(express.json());
 app.use(cookieParser());
 app.use(requestLogger);
