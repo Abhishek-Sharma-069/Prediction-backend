@@ -19,9 +19,9 @@ dotenv.config();
 const app = express();
 const PORT = config.port || 3000;
 
-const allowedOrigins = process.env.CORS_ORIGINS
+const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
-  : ['*'];
+  : [];
 
 const corsOptions = {
   origin(origin, callback) {
@@ -57,13 +57,14 @@ if (config.nodeEnv === 'development') {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec));
 }
 
-app.use('/', (req, res) => {
-  res.json({ message: 'welcome on the Prediction Server' });
-});
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 app.use(requestLogger);
+
+app.get('/', (req, res) => {
+  res.json({ message: 'welcome on the Prediction Server' });
+});
 app.use('/api', routes);
 
 /**
