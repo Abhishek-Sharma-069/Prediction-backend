@@ -1,4 +1,7 @@
 import { prisma } from '../lib/db.js';
+import config from '../config/config.js';
+import * as smsService from './sms.service.js';
+import * as emailService from './email.service.js';
 
 function toResponse(row) {
   if (!row) return null;
@@ -21,6 +24,43 @@ export async function findById(id) {
   return toResponse(row);
 }
 
+async function notifyAlert(alertRow) {
+  const message = alertRow.message || 'New alert issued.';
+  const isDev = config.nodeEnv === 'development';
+  const phones = config.alertNotifyPhones || [];
+  const emails = config.alertNotifyEmails || [];
+
+  if (isDev) {
+    console.log('[Alert (dev)]', {
+      alertId: String(alertRow.id),
+      message,
+      wouldNotifyPhones: phones.length ? phones : '(none configured)',
+      wouldNotifyEmails: emails.length ? emails : '(none configured)',
+    });
+    return;
+  }
+
+  for (const to of phones) {
+    try {
+      await smsService.sendSms({ to, body: `Alert: ${message}` });
+    } catch (err) {
+      console.error('[Alert] SMS failed:', to, err.message);
+    }
+  }
+  for (const to of emails) {
+    try {
+      await emailService.sendEmail({
+        to,
+        subject: 'Alert notification',
+        text: message,
+        html: `<p>${message}</p>`,
+      });
+    } catch (err) {
+      console.error('[Alert] Email failed:', to, err.message);
+    }
+  }
+}
+
 export async function create(data) {
   const row = await prisma.alerts.create({
     data: {
@@ -33,6 +73,15 @@ export async function create(data) {
       status: data.status ?? null,
     },
   });
+  try {
+    await notifyAlert(row);
+  } catch (err) {
+    if (config.nodeEnv === 'development') {
+      console.log('[Alert] Notify (dev):', err.message);
+    } else {
+      console.error('[Alert] Notify failed:', err.message);
+    }
+  }
   return toResponse(row);
 }
 

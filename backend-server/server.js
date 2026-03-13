@@ -79,7 +79,7 @@ app.use('/api', routes);
  */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
-});
+}); 
 
 app.use(errorHandler);
 

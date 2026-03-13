@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { generateOtp, verifyOtp } from '../utils/otp.util.js';
 import config from '../config/config.js';
 import { prisma } from '../lib/db.js';
+import * as smsService from './sms.service.js';
+import * as emailService from './email.service.js';
 
 function normalizeEmail(v) {
   return v ? String(v).trim().toLowerCase() : null;
@@ -42,7 +44,30 @@ export async function sendOtp(emailOrMobile) {
     data: { otp },
   });
 
-  return { message: 'OTP sent', otp: config.nodeEnv === 'development' ? otp : undefined };
+  // Production: send OTP via Twilio SMS (mobile) or email (email). Development: no real send (sms/email services log only).
+  const otpBody = `Your OTP is: ${otp}`;
+  const isDev = config.nodeEnv === 'development';
+  try {
+    if (email) {
+      await emailService.sendEmail({
+        to: email,
+        subject: 'Your OTP',
+        text: otpBody,
+        html: `<p>Your OTP is: <strong>${otp}</strong></p>`,
+      });
+    } else if (mobile) {
+      await smsService.sendSms({ to: mobile, body: otpBody });
+    }
+  } catch (err) {
+    if (isDev) {
+      console.log('[OTP] Send skipped (dev):', err.message);
+    } else {
+      throw err;
+    }
+  }
+
+  // Development: OTP in response for convenience. Production: never include OTP in response (sent only via SMS/email).
+  return { message: 'OTP sent', otp: isDev ? otp : undefined };
 }
 
 export async function register({ name, email, mobile, password }) {
