@@ -13,50 +13,82 @@ function normalizeMobile(v) {
   return v ? String(v).replace(/\D/g, '') : null;
 }
 
+/**
+ * Build E.164 mobile string (e.g. +918931929272).
+ * @param {string} mobile - digits or number with/without +
+ * @param {string} [countryCode] - e.g. "91" or "+91"; falls back to config.defaultSmsCountryCode
+ */
+export function toE164(mobile, countryCode) {
+  const digits = String(mobile ?? '').replace(/\D/g, '');
+  if (!digits) return null;
+  if (String(mobile).trim().startsWith('+')) return `+${digits}`;
+  const cc = (countryCode ?? config.defaultSmsCountryCode ?? '').replace(/\D/g, '');
+  return cc ? `+${cc}${digits}` : `+${digits}`;
+}
+
 async function findUserByIdentifier(emailOrMobile) {
   if (!emailOrMobile) return null;
   const s = String(emailOrMobile).trim();
   const isEmail = s.includes('@');
   const where = isEmail
     ? { email: normalizeEmail(s) }
-    : { mobile: normalizeMobile(s) };
-  return prisma.users.findFirst({ where });
+    : { mobile: s };
+  return prisma.users.findFirst({
+    where,
+    include: {
+      user_roles: {
+        include: {
+          roles: true,
+        },
+      },
+    },
+  });
 }
 
-export async function sendOtp(emailOrMobile) {
-  const email = normalizeEmail(emailOrMobile);
-  const mobile = normalizeMobile(emailOrMobile);
-  const key = email || mobile;
-  if (!key) {
+function buildIdentifier(email, mobile, countryCode) {
+  if (email && String(email).trim().includes('@')) return String(email).trim();
+  if (mobile) return toE164(mobile, countryCode);
+  return null;
+}
+
+export async function sendOtp({ email, mobile, countryCode } = {}) {
+  const identifier = buildIdentifier(email, mobile, countryCode);
+  if (!identifier) {
     throw Object.assign(new Error('Email or mobile is required'), { statusCode: 400 });
   }
+  const s = identifier;
+  const isEmail = s.includes('@');
+  const emailVal = isEmail ? normalizeEmail(s) : null;
+  const mobileVal = !isEmail ? s : null;
+
   // Only allow OTP for existing users
-  const user = await findUserByIdentifier(emailOrMobile);
+  const user = await findUserByIdentifier(identifier);
   if (!user) {
     throw Object.assign(new Error('User not found for this email/mobile'), { statusCode: 404 });
   }
 
   const otp = generateOtp(6);
+  const otpString = String(otp).trim();
 
-  // Persist the OTP directly in the existing user row
+  // Persist the OTP directly in the existing user row (explicit string for DB)
   await prisma.users.update({
     where: { id: user.id },
-    data: { otp },
+    data: { otp: otpString },
   });
 
   // Production: send OTP via Twilio SMS (mobile) or email (email). Development: no real send (sms/email services log only).
   const otpBody = `Your OTP is: ${otp}`;
   const isDev = config.nodeEnv === 'development';
   try {
-    if (email) {
+    if (emailVal) {
       await emailService.sendEmail({
-        to: email,
+        to: emailVal,
         subject: 'Your OTP',
         text: otpBody,
         html: `<p>Your OTP is: <strong>${otp}</strong></p>`,
       });
-    } else if (mobile) {
-      await smsService.sendSms({ to: mobile, body: otpBody });
+    } else if (mobileVal) {
+      await smsService.sendSms({ to: mobileVal, body: otpBody });
     }
   } catch (err) {
     if (isDev) {
@@ -70,12 +102,12 @@ export async function sendOtp(emailOrMobile) {
   return { message: 'OTP sent', otp: isDev ? otp : undefined };
 }
 
-export async function register({ name, email, mobile, password }) {
+export async function register({ name, email, mobile, password, countryCode }) {
   if (!password || password.length < 6) {
     throw Object.assign(new Error('Password is required (min 6 characters)'), { statusCode: 400 });
   }
   const emailKey = normalizeEmail(email);
-  const mobileKey = normalizeMobile(mobile);
+  const mobileKey = mobile ? toE164(mobile, countryCode) : null;
   if (!emailKey && !mobileKey) {
     throw Object.assign(new Error('Email or mobile is required'), { statusCode: 400 });
   }
@@ -94,6 +126,9 @@ export async function register({ name, email, mobile, password }) {
       email: emailKey || null,
       mobile: mobileKey || null,
       password_hash: passwordHash,
+    },
+    include: {
+      user_roles: { include: { roles: true } },
     },
   });
   return toUserResponse(user);
@@ -116,13 +151,19 @@ export async function loginWithOtp(identifier, otp) {
     throw Object.assign(new Error('Email or mobile is required'), { statusCode: 400 });
   }
 
-  // Validate OTP purely against the database.
+  // Find the same user that was used in sendOtp (same identifier normalization)
   const user = await findUserByIdentifier(identifier);
-  if (!user || !user.otp) {
+  if (!user) {
+    throw Object.assign(new Error('User not found'), { statusCode: 401 });
+  }
+
+  const storedOtp = user.otp != null ? String(user.otp).trim() : '';
+  if (storedOtp.length === 0) {
     throw Object.assign(new Error('OTP not found or expired'), { statusCode: 400 });
   }
 
-  if (!verifyOtp(user.otp, String(otp))) {
+  const receivedOtp = otp != null ? String(otp).trim() : '';
+  if (!verifyOtp(storedOtp, receivedOtp)) {
     throw Object.assign(new Error('Invalid OTP'), { statusCode: 401 });
   }
 
@@ -136,11 +177,18 @@ export async function loginWithOtp(identifier, otp) {
 }
 
 function toUserResponse(row) {
+  const roleNames = (row.user_roles || [])
+    .map((ur) => ur.roles?.role_name)
+    .filter(Boolean);
+  const role = roleNames[0] ?? null;
   return {
     id: String(row.id),
     name: row.name ?? undefined,
     email: row.email ?? undefined,
     mobile: row.mobile ?? undefined,
+    role: role ?? undefined,
+    role_name: role ?? undefined,
+    roles: roleNames.length ? roleNames : undefined,
   };
 }
 
@@ -154,4 +202,14 @@ function signUser(row) {
     token,
     user: toUserResponse(row),
   };
+}
+
+/** All roles in the DB (for admin UI / role dropdowns). */
+export async function getAllRoles() {
+  const rows = await prisma.roles.findMany({ orderBy: { id: 'asc' } });
+  return rows.map((r) => ({
+    id: String(r.id),
+    role_name: r.role_name ?? undefined,
+    description: r.description ?? undefined,
+  }));
 }

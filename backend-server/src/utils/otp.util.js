@@ -7,4 +7,9 @@ export const generateOtp = (length = 6) => {
   return otp;
 };
 
-export const verifyOtp = (stored, received) => stored === received;
+/** Compare OTP after normalizing to string and trimming (DB may return different types). */
+export const verifyOtp = (stored, received) => {
+  const a = stored != null ? String(stored).trim() : '';
+  const b = received != null ? String(received).trim() : '';
+  return a.length > 0 && a === b;
+};

@@ -3,11 +3,9 @@ import config from '../config/config.js';
 
 export async function sendOtp(req, res, next) {
   try {
-    const { email, mobile } = req.body;
-    const identifier = email || mobile;
-    const result = await authService.sendOtp(identifier);
+    const { email, mobile, countryCode } = req.body;
+    const result = await authService.sendOtp({ email, mobile, countryCode });
     res.json(result);
-    
   } catch (err) {
     next(err);
   }
@@ -15,8 +13,8 @@ export async function sendOtp(req, res, next) {
 
 export async function register(req, res, next) {
   try {
-    const { name, email, mobile, password } = req.body;
-    const user = await authService.register({ name, email, mobile, password });
+    const { name, email, mobile, password, countryCode } = req.body;
+    const user = await authService.register({ name, email, mobile, password, countryCode });
     res.status(201).json({ message: 'Registered successfully', user });
   } catch (err) {
     next(err);
@@ -25,8 +23,8 @@ export async function register(req, res, next) {
 
 export async function login(req, res, next) {
   try {
-    const { email, mobile, password, otp } = req.body;
-    const identifier = email || mobile;
+    const { email, mobile, password, otp, countryCode } = req.body;
+    const identifier = email || (mobile ? authService.toE164(mobile, countryCode) : null);
     const hasPassword = password !== undefined && password !== null && String(password).trim() !== '';
     const hasOtp = otp !== undefined && otp !== null && String(otp).trim() !== '';
 
@@ -56,7 +54,9 @@ export async function login(req, res, next) {
       maxAge: config.cookieMaxAge,
       sameSite: 'lax',
     });
-    res.json({ message: 'Logged in', user, token });
+
+    const allRoles = await authService.getAllRoles();
+    res.json({ message: 'Logged in', user, allRoles });
   } catch (err) {
     next(err);
   }
