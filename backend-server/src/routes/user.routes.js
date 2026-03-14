@@ -15,6 +15,10 @@ const router = express.Router();
  */
 router.get('/', userController.getUsers);
 
+router.get('/:id/roles', userController.getUserRoles);
+router.post('/:id/roles', userController.addUserRole);
+router.delete('/:id/roles/:roleId', userController.removeUserRole);
+
 /**
  * @openapi
  * /api/users/{id}:

@@ -1,0 +1,49 @@
+import { prisma } from '../lib/db.js';
+
+function toResponse(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    id: String(row.id),
+    population: row.population != null ? String(row.population) : null,
+  };
+}
+
+export async function findAll() {
+  const rows = await prisma.regions.findMany({ orderBy: { name: 'asc' } });
+  return rows.map(toResponse);
+}
+
+export async function findById(id) {
+  const row = await prisma.regions.findFirst({ where: { id: BigInt(id) } });
+  return toResponse(row);
+}
+
+export async function create(data) {
+  const row = await prisma.regions.create({
+    data: {
+      name: data.name ?? null,
+      type: data.type ?? null,
+      population: data.population != null ? BigInt(data.population) : null,
+      risk_zone_level: data.risk_zone_level ?? null,
+    },
+  });
+  return toResponse(row);
+}
+
+export async function update(id, data) {
+  const payload = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.type !== undefined) payload.type = data.type;
+  if (data.population !== undefined) payload.population = data.population == null ? null : BigInt(data.population);
+  if (data.risk_zone_level !== undefined) payload.risk_zone_level = data.risk_zone_level;
+  const row = await prisma.regions.update({
+    where: { id: BigInt(id) },
+    data: payload,
+  });
+  return toResponse(row);
+}
+
+export async function remove(id) {
+  await prisma.regions.delete({ where: { id: BigInt(id) } });
+}

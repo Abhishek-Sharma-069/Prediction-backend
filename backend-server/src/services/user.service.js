@@ -55,3 +55,44 @@ export async function update(id, data) {
 export async function remove(id) {
   await prisma.users.delete({ where: { id: BigInt(id) } });
 }
+
+export async function findUserRoles(userId) {
+  const rows = await prisma.user_roles.findMany({
+    where: { user_id: BigInt(userId) },
+    include: { roles: true },
+  });
+  return rows.map((r) => ({
+    role_id: String(r.role_id),
+    role_name: r.roles?.role_name ?? null,
+    description: r.roles?.description ?? null,
+  }));
+}
+
+export async function addUserRole(userId, roleId) {
+  await prisma.user_roles.create({
+    data: {
+      user_id: BigInt(userId),
+      role_id: BigInt(roleId),
+    },
+  });
+  const rows = await prisma.user_roles.findMany({
+    where: { user_id: BigInt(userId) },
+    include: { roles: true },
+  });
+  return rows.map((r) => ({
+    role_id: String(r.role_id),
+    role_name: r.roles?.role_name ?? null,
+    description: r.roles?.description ?? null,
+  }));
+}
+
+export async function removeUserRole(userId, roleId) {
+  await prisma.user_roles.delete({
+    where: {
+      user_id_role_id: {
+        user_id: BigInt(userId),
+        role_id: BigInt(roleId),
+      },
+    },
+  });
+}
