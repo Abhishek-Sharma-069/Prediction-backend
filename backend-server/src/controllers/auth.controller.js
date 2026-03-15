@@ -61,3 +61,12 @@ export async function login(req, res, next) {
     next(err);
   }
 }
+
+export async function logout(req, res, next) {
+  try {
+    res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' });
+    res.json({ message: 'Logged out' });
+  } catch (err) {
+    next(err);
+  }
+}

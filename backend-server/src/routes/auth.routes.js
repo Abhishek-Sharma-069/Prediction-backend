@@ -98,4 +98,16 @@ router.post('/register', authController.register);
  */
 router.post('/login', authController.login);
 
+/**
+ * @openapi
+ * /api/auth/logout:
+ *   get:
+ *     summary: Logout (clears token cookie)
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logged out
+ */
+router.get('/logout', authController.logout);
+
 export default router;
