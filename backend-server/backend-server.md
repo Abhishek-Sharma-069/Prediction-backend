@@ -131,10 +131,9 @@ Body: { region_id?, prediction_id?, alert_level_id?, message?, issued_at?, expir
 
 **notifyAlert(alert):**
 
-- **Development:** Only **console.log**: alert id, message, and “would notify” phones/emails (no real send).
-- **Production:** Sends SMS to every number in `ALERT_NOTIFY_PHONES` and email to every address in `ALERT_NOTIFY_EMAILS` (from config). Failures are logged per recipient; alert creation still succeeds.
+- Notifications use the **users** table only. If the alert has a `region_id`, users with that `region_id` are notified (SMS to `mobile`, email to `email`). If no `region_id`, all users with `mobile` or `email` are notified. Failures are logged per recipient; alert creation still succeeds.
 
-So: **Create alert → save to DB → optionally notify by SMS/email** (depending on env and config).
+So: **Create alert → save to DB → notify users from DB (by region or all)**.
 
 ---
 
@@ -150,7 +149,7 @@ Config is in **`src/config/config.js`**, driven by **`.env`**.
 | Twilio | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | SMS sending. |
 | SMS    | `DEFAULT_SMS_COUNTRY_CODE` (optional) | e.g. `91` so `9876543210` → `+919876543210`. |
 | SMTP   | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Email sending. |
-| Alerts | `ALERT_NOTIFY_PHONES`, `ALERT_NOTIFY_EMAILS` (optional) | Comma-separated; used when an alert is created in production. |
+| Automation | `ACTIVE_AUTOMATION`, `AUTOMATION_INTERVAL_MS`, `AUTOMATION_DEDUPE_MS` | Schedule and dedupe; alert notifications use the **users** table (by region). |
 
 In **dev**, SMS and email are not actually sent; behaviour is “console log or return in response as needed”.
 

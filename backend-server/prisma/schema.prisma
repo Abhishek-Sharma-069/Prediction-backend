@@ -7,10 +7,24 @@ datasource db {
 }
 
 model alert_levels {
-  id            BigInt   @id @default(autoincrement())
-  level_name    String?  @db.VarChar(100)
-  severity_rank Int?
-  alerts        alerts[]
+  id                    BigInt                   @id @default(autoincrement())
+  level_name            String?                  @db.VarChar(100)
+  severity_rank         Int?
+  alerts                alerts[]
+  alert_automation_rules alert_automation_rules[]
+}
+
+model alert_automation_rules {
+  id                BigInt        @id @default(autoincrement())
+  name              String?       @db.VarChar(200)
+  probability_field String        @db.VarChar(100)
+  threshold_min     Decimal       @db.Decimal(5, 4)
+  alert_level_id    BigInt?
+  send_sms          Boolean       @default(true)
+  message_template  String?
+  is_active         Boolean       @default(true)
+  created_at        DateTime?     @default(now()) @db.Timestamp(6)
+  alert_levels      alert_levels? @relation(fields: [alert_level_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "alert_automation_rules_alert_level_fk")
 }
 
 model alerts {
@@ -63,16 +77,20 @@ model predictions {
 }
 
 model regions {
-  id              BigInt        @id @default(autoincrement())
-  name            String?       @db.VarChar(150)
-  type            String?       @db.VarChar(100)
-  population      BigInt?
-  risk_zone_level Int?
-  created_at      DateTime?     @default(now()) @db.Timestamp(6)
-  alerts          alerts[]
-  predictions     predictions[]
-  sensors         sensors[]
-  users           users[]
+  id                   BigInt        @id @default(autoincrement())
+  name                 String?       @db.VarChar(150)
+  type                 String?       @db.VarChar(100)
+  population           BigInt?
+  risk_zone_level      Int?
+  latitude             Float?
+  longitude            Float?
+  timezone             String?       @db.VarChar(100)
+  auto_predict_enabled Boolean       @default(false)
+  created_at           DateTime?     @default(now()) @db.Timestamp(6)
+  alerts               alerts[]
+  predictions          predictions[]
+  sensors              sensors[]
+  users                users[]
 }
 
 model roles {

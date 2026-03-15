@@ -13,6 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import routes from './src/routes/index.js';
 import { requestLogger } from './src/middlewares/requestLogger.middleware.js';
 import { errorHandler } from './src/middlewares/error.middleware.js';
+import { runAutomationJob } from './src/services/automation.service.js';
 
 dotenv.config();
 
@@ -94,4 +95,19 @@ try {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`API docs: http://localhost:${PORT}/api-docs`);
+
+  // Automation job: set ACTIVE_AUTOMATION=yes and AUTOMATION_INTERVAL_MS=<milliseconds> in .env
+  const activeAutomation = (process.env.ACTIVE_AUTOMATION || '').toLowerCase() === 'yes';
+  const intervalMs = Number(process.env.AUTOMATION_INTERVAL_MS) || 0;
+  if (activeAutomation && intervalMs > 0) {
+    setInterval(async () => {
+      try {
+        const result = await runAutomationJob();
+        console.log('[Automation]', result);
+      } catch (err) {
+        console.error('[Automation]', err.message);
+      }
+    }, intervalMs);
+    console.log(`Automation job scheduled every ${intervalMs} ms`);
+  }
 });

@@ -5,13 +5,17 @@ import * as emailService from './email.service.js';
 
 function toResponse(row) {
   if (!row) return null;
-  return {
-    ...row,
+  const out = {
     id: String(row.id),
     region_id: row.region_id != null ? String(row.region_id) : null,
     prediction_id: row.prediction_id != null ? String(row.prediction_id) : null,
     alert_level_id: row.alert_level_id != null ? String(row.alert_level_id) : null,
+    message: row.message,
+    issued_at: row.issued_at,
+    expires_at: row.expires_at,
+    status: row.status,
   };
+  return out;
 }
 
 export async function findAll() {
@@ -66,41 +70,24 @@ export async function findById(id) {
   return toResponse(row);
 }
 
-async function notifyAlert(alertRow) {
-  const message = alertRow.message || 'New alert issued.';
-  const isDev = config.nodeEnv === 'development';
-  const phones = config.alertNotifyPhones || [];
-  const emails = config.alertNotifyEmails || [];
-
-  if (isDev) {
-    console.log('[Alert (dev)]', {
-      alertId: String(alertRow.id),
-      message,
-      wouldNotifyPhones: phones.length ? phones : '(none configured)',
-      wouldNotifyEmails: emails.length ? emails : '(none configured)',
+/**
+ * @param {{ sendSms?: boolean, sendEmail?: boolean }} [notifyChannels] - If omitted, both true (send SMS and email).
+ */
+async function notifyAlert(alertRow, notifyChannels = { sendSms: true, sendEmail: true }) {
+  const regionId = alertRow.region_id != null ? BigInt(alertRow.region_id) : null;
+  let users = [];
+  if (regionId != null) {
+    users = await prisma.users.findMany({
+      where: { region_id: regionId },
+      select: { email: true, mobile: true },
     });
-    return;
+  } else {
+    users = await prisma.users.findMany({
+      where: { OR: [{ email: { not: null } }, { mobile: { not: null } }] },
+      select: { email: true, mobile: true },
+    });
   }
-
-  for (const to of phones) {
-    try {
-      await smsService.sendSms({ to, body: `Alert: ${message}` });
-    } catch (err) {
-      console.error('[Alert] SMS failed:', to, err.message);
-    }
-  }
-  for (const to of emails) {
-    try {
-      await emailService.sendEmail({
-        to,
-        subject: 'Alert notification',
-        text: message,
-        html: `<p>${message}</p>`,
-      });
-    } catch (err) {
-      console.error('[Alert] Email failed:', to, err.message);
-    }
-  }
+  await notifyUsers(alertRow, users, notifyChannels);
 }
 
 function parseDate(v) {
@@ -109,7 +96,11 @@ function parseDate(v) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export async function create(data) {
+/**
+ * @param {object} data - Alert fields (region_id, prediction_id, alert_level_id, message, etc.)
+ * @param {{ skipNotify?: boolean }} [options] - If skipNotify is true, do not send SMS/email (e.g. for automation that notifies conditionally).
+ */
+export async function create(data, options = {}) {
   const row = await prisma.alerts.create({
     data: {
       region_id: data.region_id != null ? BigInt(data.region_id) : null,
@@ -121,33 +112,41 @@ export async function create(data) {
       status: data.status ?? null,
     },
   });
-  try {
-    await notifyAlert(row);
-  } catch (err) {
-    if (config.nodeEnv === 'development') {
-      console.log('[Alert] Notify (dev):', err.message);
-    } else {
-      console.error('[Alert] Notify failed:', err.message);
+  if (!options.skipNotify) {
+    const notifyChannels = {
+      sendSms: data.send_sms !== false,
+      sendEmail: data.send_email !== false,
+    };
+    try {
+      await notifyAlert(row, notifyChannels);
+    } catch (err) {
+      if (config.nodeEnv === 'development') {
+        console.log('[Alert] Notify (dev):', err.message);
+      } else {
+        console.error('[Alert] Notify failed:', err.message);
+      }
     }
   }
   return toResponse(row);
 }
 
 /**
- * Send alert to all users: create alert in DB, then notify every user with email or mobile.
+ * @param {{ sendSms?: boolean, sendEmail?: boolean }} [channels] - If omitted, both true.
  */
-async function notifyUsers(alertRow, users) {
+async function notifyUsers(alertRow, users, channels = { sendSms: true, sendEmail: true }) {
   const message = alertRow.message || 'New alert issued.';
   const isDev = config.nodeEnv === 'development';
   const sent = { emails: 0, sms: 0 };
+  const sendSms = channels.sendSms !== false;
+  const sendEmail = channels.sendEmail !== false;
 
   if (isDev) {
-    console.log('[Alert send] Would notify users:', users?.length ?? 0, users?.map((u) => u.email || u.mobile));
+    console.log('[Alert send] Would notify users:', users?.length ?? 0, { sendSms, sendEmail });
     return sent;
   }
 
   for (const user of users || []) {
-    if (user.mobile) {
+    if (sendSms && user.mobile) {
       try {
         await smsService.sendSms({ to: user.mobile, body: `Alert: ${message}` });
         sent.sms += 1;
@@ -155,7 +154,7 @@ async function notifyUsers(alertRow, users) {
         console.error('[Alert] SMS failed:', user.mobile, err.message);
       }
     }
-    if (user.email) {
+    if (sendEmail && user.email) {
       try {
         await emailService.sendEmail({
           to: user.email,
@@ -170,6 +169,20 @@ async function notifyUsers(alertRow, users) {
     }
   }
   return sent;
+}
+
+/**
+ * Notify users whose region_id matches the given region.
+ * @param {{ sendSms?: boolean, sendEmail?: boolean }} [channels] - If omitted, both true.
+ */
+export async function notifyUsersInRegion(regionId, message, channels = { sendSms: true, sendEmail: true }) {
+  if (regionId == null) return { sms: 0, emails: 0 };
+  const users = await prisma.users.findMany({
+    where: { region_id: BigInt(regionId) },
+    select: { email: true, mobile: true },
+  });
+  const alertRow = { message: message || 'New alert issued.' };
+  return notifyUsers(alertRow, users, channels);
 }
 
 export async function sendAlertToUsers(data) {
@@ -190,8 +203,12 @@ export async function sendAlertToUsers(data) {
     },
     select: { email: true, mobile: true },
   });
+  const channels = {
+    sendSms: data.send_sms !== false,
+    sendEmail: data.send_email !== false,
+  };
   try {
-    const sent = await notifyUsers(row, users);
+    const sent = await notifyUsers(row, users, channels);
     return { ...toResponse(row), notified: sent };
   } catch (err) {
     if (config.nodeEnv === 'development') {

@@ -40,11 +40,9 @@ export default {
   smtpUser: process.env.SMTP_USER,
   smtpPass: process.env.SMTP_PASS,
   mailFrom: process.env.MAIL_FROM || process.env.SMTP_USER,
-  // Optional: comma-separated lists for alert notifications
-  alertNotifyPhones: process.env.ALERT_NOTIFY_PHONES
-    ? process.env.ALERT_NOTIFY_PHONES.split(',').map((s) => s.trim()).filter(Boolean)
-    : [],
-  alertNotifyEmails: process.env.ALERT_NOTIFY_EMAILS
-    ? process.env.ALERT_NOTIFY_EMAILS.split(',').map((s) => s.trim()).filter(Boolean)
-    : [],
+  /** Skip creating an automation alert for a region if one was already created in the last N ms (avoid duplicates). Set AUTOMATION_DEDUPE_MS in env (e.g. 1800000 = 30 min). */
+  automationDedupeMs: Number(process.env.AUTOMATION_DEDUPE_MS) || 30 * 60 * 1000,
+  /** Automation alerts: send SMS and/or email to users in region. Set AUTOMATION_ALERT_SMS and AUTOMATION_ALERT_EMAIL to yes/no (default yes). */
+  automationAlertSms: (process.env.AUTOMATION_ALERT_SMS || 'yes').toLowerCase() === 'yes',
+  automationAlertEmail: (process.env.AUTOMATION_ALERT_EMAIL || 'yes').toLowerCase() === 'yes',
 };

@@ -8,6 +8,7 @@ import mlRoutes from './ml.routes.js';
 import regionRoutes from './region.routes.js';
 import roleRoutes from './role.routes.js';
 import mlModelRoutes from './mlModel.routes.js';
+import automationRoutes from './automation.routes.js';
 
 const router = express.Router();
 router.use('/auth', authRoutes);
@@ -19,5 +20,6 @@ router.use('/ml', mlRoutes);
 router.use('/regions', regionRoutes);
 router.use('/roles', roleRoutes);
 router.use('/models', mlModelRoutes);
+router.use('/automation', automationRoutes);
 
 export default router;
