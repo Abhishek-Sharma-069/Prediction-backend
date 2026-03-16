@@ -18,7 +18,7 @@ import { runAutomationJob } from './src/services/automation.service.js';
 dotenv.config();
 
 const app = express();
-const PORT = config.port || 3000;
+const PORT = config.port;
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
@@ -80,7 +80,12 @@ app.use('/api', routes);
  */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
-}); 
+});
+
+// Catch-all for unmatched API routes (so we don't rely on Express default)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Not Found' });
+});
 
 app.use(errorHandler);
 
